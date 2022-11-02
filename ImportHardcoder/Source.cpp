@@ -95,21 +95,40 @@ int main() {
 	}
 	*/
 
-	PIMAGE_IMPORT_DESCRIPTOR pImportDescriptor;
+	PIMAGE_IMPORT_DESCRIPTOR pFirstImportDescriptor;
 	if (dataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size == 0) {
 		cout << "No import table. Quitting." << endl;
 		return 0;
 	}
 
-	pImportDescriptor = (PIMAGE_IMPORT_DESCRIPTOR)((DWORD_PTR)view + Rva2Offset(dataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress, sectionHeaders[0], ntHeaders));
-	PIMAGE_IMPORT_DESCRIPTOR pCurrImportDescriptor = pImportDescriptor;
+	pFirstImportDescriptor = (PIMAGE_IMPORT_DESCRIPTOR)((DWORD_PTR)view + Rva2Offset(dataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress, sectionHeaders[0], ntHeaders));
+	PIMAGE_IMPORT_DESCRIPTOR* pImportDescriptors = (PIMAGE_IMPORT_DESCRIPTOR*)malloc(sizeof(PIMAGE_IMPORT_DESCRIPTOR));
+	PIMAGE_IMPORT_DESCRIPTOR pCurrImportDescriptor = pFirstImportDescriptor;
+	int numberOfImageImportDescriptors = 0;
+	while (pCurrImportDescriptor->Name != NULL) {
+		pImportDescriptors = (PIMAGE_IMPORT_DESCRIPTOR*)realloc(pImportDescriptors, sizeof(PIMAGE_IMPORT_DESCRIPTOR) * (numberOfImageImportDescriptors + 1));
+		pImportDescriptors[numberOfImageImportDescriptors] = (PIMAGE_IMPORT_DESCRIPTOR)malloc(sizeof(IMAGE_IMPORT_DESCRIPTOR));
+		if (!memcpy(pImportDescriptors[numberOfImageImportDescriptors], pCurrImportDescriptor, sizeof(IMAGE_IMPORT_DESCRIPTOR))) {
+			cout << "[-] There was an error copying the image import descriptor at index " << numberOfImageImportDescriptors << ". Quitting." << endl;
+			return 0;
+		}
+		pCurrImportDescriptor = (PIMAGE_IMPORT_DESCRIPTOR)((PBYTE)pCurrImportDescriptor + sizeof(IMAGE_IMPORT_DESCRIPTOR));
+		printf("Curr Address: 0x%p\n", (char*)view + Rva2Offset(pImportDescriptors[numberOfImageImportDescriptors]->Name, sectionHeaders[0], ntHeaders));
+		cout << "Curr OriginalFirstThunk: " << pImportDescriptors[numberOfImageImportDescriptors]->OriginalFirstThunk << endl;
+		cout << "Curr TimeDateStamp: " << pImportDescriptors[numberOfImageImportDescriptors]->TimeDateStamp << endl;
+		cout << "Curr ForwarderChain: " << pImportDescriptors[numberOfImageImportDescriptors]->ForwarderChain << endl;
+		cout << "Curr Name: " << (char*)view + Rva2Offset(pImportDescriptors[numberOfImageImportDescriptors]->Name, sectionHeaders[0], ntHeaders) << endl;
+		cout << "Curr FirstThunk: " << pImportDescriptors[numberOfImageImportDescriptors]->FirstThunk << endl;
+		cout << endl;
+		numberOfImageImportDescriptors++;
+	}
 
 	cout << "-----" << endl;
 	int indexOfSectionContainingImportTable = -1;
 	PBYTE pStartOfNextSection = 0x0;
 	PBYTE pEndOfLastSection = 0x0;
 	for (int i = 0; i < ntHeaders->FileHeader.NumberOfSections - 1; i++) {
-		if ((PBYTE)pImportDescriptor >= (PBYTE)view + Rva2Offset(sectionHeaders[i]->VirtualAddress, sectionHeaders[0], ntHeaders) && (PBYTE)pImportDescriptor < (PBYTE)view + Rva2Offset(sectionHeaders[i + 1]->VirtualAddress, sectionHeaders[0], ntHeaders)) {
+		if ((PBYTE)pFirstImportDescriptor >= (PBYTE)view + Rva2Offset(sectionHeaders[i]->VirtualAddress, sectionHeaders[0], ntHeaders) && (PBYTE)pFirstImportDescriptor < (PBYTE)view + Rva2Offset(sectionHeaders[i + 1]->VirtualAddress, sectionHeaders[0], ntHeaders)) {
 			cout << "The import directory is in the '" << sectionHeaders[i]->Name << "' section" << endl;
 			cout << "VirtualAddress of this section: 0x" << (DWORD)((PBYTE)view + sectionHeaders[i]->VirtualAddress) << endl;
 			cout << "VirtualSize of this section: " << sectionHeaders[i]->Misc.VirtualSize << endl;
@@ -135,28 +154,27 @@ int main() {
 	// 4. If they don't, or if you wanna do it less the arab way and more the good way, increase the target section by sizeof(IMAGE_IMPORT_DESCRIPTOR) bytes, put our struct in the right place, and move all the data in the section from that address sizeof(IMAGE_IMPORT_DESCRIPTOR) bytes forward
 
 
+	/*
 	PBYTE t = (PBYTE)calloc(sizeof(IMAGE_IMPORT_DESCRIPTOR), 1);
 	PBYTE pLastBytesOfTargetSection = (PBYTE)pStartOfNextSection - sizeof(IMAGE_IMPORT_DESCRIPTOR);
 	cout << "lets see: 0x" << (PDWORD)pLastBytesOfTargetSection << endl;
 	if (!memcmp(pLastBytesOfTargetSection, t, sizeof(IMAGE_IMPORT_DESCRIPTOR))) {
 		cout << "HEYY" << endl;
 	}
+	*/
 
-	while (pCurrImportDescriptor->Name != NULL) {
-		//cout << "Curr import: " << (char*)view + Rva2Offset(pCurrImportDescriptor->Name, sectionHeaders[0], ntHeaders) << endl;
-		printf("Curr Address: 0x%p\n", (char*)view + Rva2Offset(pCurrImportDescriptor->Name, sectionHeaders[0], ntHeaders));
-		pCurrImportDescriptor = (PIMAGE_IMPORT_DESCRIPTOR)((PBYTE)pCurrImportDescriptor + sizeof(IMAGE_IMPORT_DESCRIPTOR));
-		cout << "Curr OriginalFirstThunk: " << pCurrImportDescriptor->OriginalFirstThunk << endl;
-		cout << "Curr TimeDateStamp: " << pCurrImportDescriptor->TimeDateStamp << endl;
-		cout << "Curr ForwarderChain: " << pCurrImportDescriptor->ForwarderChain << endl;
-		cout << "Curr Name: " << (char*)view + Rva2Offset(pCurrImportDescriptor->Name, sectionHeaders[0], ntHeaders) << endl;
-		cout << "Curr FirstThunk: " << pCurrImportDescriptor->FirstThunk << endl;
-		cout << endl;
-	}
+
 	//(PBYTE)view + sectionHeaders[ntHeaders->FileHeader.NumberOfSections - 1]->PointerToRawData + sectionHeaders[ntHeaders->FileHeader.NumberOfSections - 1]->SizeOfRawData;
-	sectionHeaders[ntHeaders->FileHeader.NumberOfSections - 1]->SizeOfRawData += optionalHeader->FileAlignment;
-	sectionHeaders[ntHeaders->FileHeader.NumberOfSections - 1]->Misc.VirtualSize += optionalHeader->FileAlignment;
+	//sectionHeaders[ntHeaders->FileHeader.NumberOfSections - 1]->SizeOfRawData += optionalHeader->FileAlignment;
+	//sectionHeaders[ntHeaders->FileHeader.NumberOfSections - 1]->Misc.VirtualSize += optionalHeader->FileAlignment;
 
+	// TODO:
+	// ADD 2 Import descriptors to our pImportDescriptors pointers array:
+	// 1. The first one will be our own IMAGE_IMPORT_DESCRIPTOR (the one that includes our malicious import.
+	// 2. The second one will be the last IMAGE_IMPORT_DESCRIPTOR in the array, which is the one that it's values are all 0 to indicate that we have reached the end of this array.
+	// The second one is easy. The first one tho... We will need to read in depth about firstThunk and originalFirstThunk and figure out a way to place there good values, and check where do we store the dll name.
+	// Then we need to check if we have to add stuff to the IAT and ILT (hopefully not). Finally, we will need to store our new pointers array at the end of the last section and redirect the dataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT] to the new array's address.
+	// GOOD LUCK :D
 
 	return 0;
 
