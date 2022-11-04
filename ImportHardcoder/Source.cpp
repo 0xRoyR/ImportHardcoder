@@ -67,23 +67,6 @@ int main() {
 	}
 	cout << "[+] Read " << fileName << " to memory at: 0x" << view << endl;
 
-	/*
-	HANDLE hFileMappingObject = CreateFileMappingA(hFile, NULL, PAGE_READWRITE, 0, 0, NULL);
-	if (hFileMappingObject == NULL) {
-		cout << GetLastError() << endl;
-		cout << "[-] Error getting handle to file mapping object. Quitting." << endl;
-		return 0;
-	}
-	cout << "[+] Got handle to file mapping object: 0x" << hFileMappingObject << endl;
-
-	LPVOID view = MapViewOfFileEx(hFileMappingObject, FILE_MAP_ALL_ACCESS, 0, 0, 0, NULL);
-	if (view == NULL) {
-		cout << "[-] Fialed to map the file to memory. Quitting." << endl;
-		return 0;
-	}
-	cout << "[+] Mapped the file to memory at: 0x" << view << endl;
-	*/
-
 	PIMAGE_DOS_HEADER dosHeader = (PIMAGE_DOS_HEADER)view;
 	if (dosHeader->e_magic != IMAGE_DOS_SIGNATURE) {
 		cout << "[-] Invalid DOS Signature. Quitting" << endl;
@@ -99,41 +82,13 @@ int main() {
 	PIMAGE_DATA_DIRECTORY dataDirectory = (PIMAGE_DATA_DIRECTORY)(optionalHeader->DataDirectory);
 	PIMAGE_SECTION_HEADER* sectionHeaders = (PIMAGE_SECTION_HEADER*)malloc(ntHeaders->FileHeader.NumberOfSections * sizeof(PIMAGE_SECTION_HEADER));
 	if (sectionHeaders == NULL) {
-		cout << "oooops" << endl;
+		//cout << "oooops" << endl;
 		return 0;
 	}
 	for (int i = 0; i < ntHeaders->FileHeader.NumberOfSections; i++) {
 		sectionHeaders[i] = (PIMAGE_SECTION_HEADER)((PBYTE)optionalHeader + ntHeaders->FileHeader.SizeOfOptionalHeader + sizeof(IMAGE_SECTION_HEADER) * i);
-		cout << "This is the section header of section '" << sectionHeaders[i]->Name << "'." << "Start of raw data: 0x" << (PDWORD)((PBYTE)view + Rva2Offset(sectionHeaders[i]->VirtualAddress, sectionHeaders[0], ntHeaders)) << endl;
-		/* This part is to check if my function "Offset2Rva" works
-		printf("\t\tfirst RVA: 0x%p\n", sectionHeaders[i]->VirtualAddress);
-		DWORD currOffset = Rva2Offset(sectionHeaders[i]->VirtualAddress, sectionHeaders[0], ntHeaders);
-		printf("\t\toffset: 0x%p\n", currOffset);
-		printf("\t\tsecond RVA: 0x%p\n", Offset2Rva(currOffset, sectionHeaders[0], ntHeaders));
-		*/
+		//cout << "This is the section header of section '" << sectionHeaders[i]->Name << "'." << "Start of raw data: 0x" << (PDWORD)((PBYTE)view + Rva2Offset(sectionHeaders[i]->VirtualAddress, sectionHeaders[0], ntHeaders)) << endl;
 	}
-
-
-	/*
-	PIMAGE_IMPORT_DESCRIPTOR importDirectory = (PIMAGE_IMPORT_DESCRIPTOR)((PBYTE)view + dataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
-	cout << "Address of data directory: 0x" << dataDirectory << endl;
-	cout << "Address of import directory: 0x" << importDirectory << endl;
-	
-	for (int i = 0; i < ntHeaders->FileHeader.NumberOfSections - 1; i++) {
-		if ((PDWORD)importDirectory >= (PDWORD)((PBYTE)view + sectionHeaders[i]->VirtualAddress) && (PDWORD)importDirectory < (PDWORD)((PBYTE)view + sectionHeaders[i + 1]->VirtualAddress)) {
-			cout << "The import directory is in the '" << sectionHeaders[i]->Name << "' section" << endl;
-			break;
-		}
-	}
-
-	PIMAGE_IMPORT_DESCRIPTOR firstImport = importDirectory;
-	while (firstImport->FirstThunk) {
-		cout << "current import: " << firstImport->Name << endl;
-		cout << "current import name should be at: 0x" << (PVOID)((char*)view + firstImport->Name) << endl;
-		cout << "ttt: " << (char*)view + Rva2Offset(firstImport->Name, sectionHeaders[0], ntHeaders);
-		firstImport = (PIMAGE_IMPORT_DESCRIPTOR)((PBYTE)firstImport + sizeof(IMAGE_IMPORT_DESCRIPTOR));
-	}
-	*/
 
 	PIMAGE_IMPORT_DESCRIPTOR pFirstImportDescriptor;
 	if (dataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size == 0) {
@@ -153,6 +108,7 @@ int main() {
 			return 0;
 		}
 		pCurrImportDescriptor = (PIMAGE_IMPORT_DESCRIPTOR)((PBYTE)pCurrImportDescriptor + sizeof(IMAGE_IMPORT_DESCRIPTOR));
+		
 		printf("Curr Address: 0x%p\n", (char*)view + Rva2Offset(pImportDescriptors[numberOfImageImportDescriptors]->Name, sectionHeaders[0], ntHeaders));
 		cout << "Curr OriginalFirstThunk: " << pImportDescriptors[numberOfImageImportDescriptors]->OriginalFirstThunk << endl;
 		cout << "Curr TimeDateStamp: " << pImportDescriptors[numberOfImageImportDescriptors]->TimeDateStamp << endl;
@@ -160,11 +116,11 @@ int main() {
 		cout << "Curr Name: " << (char*)view + Rva2Offset(pImportDescriptors[numberOfImageImportDescriptors]->Name, sectionHeaders[0], ntHeaders) << endl;
 		cout << "Curr FirstThunk: " << pImportDescriptors[numberOfImageImportDescriptors]->FirstThunk << endl;
 		cout << endl;
+		
 		numberOfImageImportDescriptors++;
 	}
-	cout << "Total number of original image import descriptors: " << numberOfImageImportDescriptors << endl;
 
-	cout << "-----" << endl;
+	
 	int indexOfSectionContainingImportTable = -1;
 	PBYTE pStartOfNextSection_FullAddress = 0x0;
 	PBYTE pEndOfLastSection_FullAddress = 0x0;
@@ -186,6 +142,7 @@ int main() {
 		indexOfSectionContainingImportTable = ntHeaders->FileHeader.NumberOfSections - 1;
 		pStartOfNextSection_FullAddress = pEndOfLastSection_FullAddress;
 	}
+	
 
 	// Get the RVA of the end of the executable. This will use us later.
 	DWORD endOfLastSection_VirtualAddress = sectionHeaders[ntHeaders->FileHeader.NumberOfSections - 1]->VirtualAddress + sectionHeaders[ntHeaders->FileHeader.NumberOfSections - 1]->SizeOfRawData;
@@ -234,15 +191,6 @@ int main() {
 	pImportDescriptors[numberOfImageImportDescriptors - 1]->Name = 0;
 	pImportDescriptors[numberOfImageImportDescriptors - 1]->OriginalFirstThunk = 0;
 	pImportDescriptors[numberOfImageImportDescriptors - 1]->TimeDateStamp = 0;
-
-	for (int k = 0; k < numberOfImageImportDescriptors; k++) {
-		cout << "pImportDescriptors[k]->Characteristics: " << pImportDescriptors[k]->Characteristics << endl;
-		cout << "pImportDescriptors[k]->FirstThunk: " << pImportDescriptors[k]->FirstThunk << endl;
-		cout << "pImportDescriptors[k]->ForwarderChain: " << pImportDescriptors[k]->ForwarderChain << endl;
-		cout << "pImportDescriptors[k]->Name: " << pImportDescriptors[k]->Name << endl;
-		cout << "pImportDescriptors[k]->OriginalFirstThunk: " << pImportDescriptors[k]->OriginalFirstThunk << endl;
-		cout << "pImportDescriptors[k]->TimeDateStamp: " << pImportDescriptors[k]->TimeDateStamp << endl << endl;
-	}
 
 	// Set the Image Data Directory pointer to point the new image import descriptors array
 	dataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress = endOfLastSection_VirtualAddress;
