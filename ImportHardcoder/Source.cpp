@@ -50,9 +50,6 @@ int main(int argc, char *argv[]) {
 	LPCSTR inFile = argv[1]; // Path to the input exe file
 	LPCSTR dllName = argv[2]; // The name of the dll
 	LPCSTR outFile = argv[3]; // Path to the output exe file
-	//LPCSTR inFile = "C:\\Users\\Roy\\Desktop\\SimpleEXE.exe";
-	//LPCSTR dllName = "dllName";
-	//LPCSTR outFile = "C:\\Users\\Roy\\Desktop\\res.exe";
 
 	HANDLE hFile = CreateFileA(inFile, GENERIC_ALL, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (hFile == INVALID_HANDLE_VALUE) {
@@ -187,7 +184,6 @@ int main(int argc, char *argv[]) {
 			return 0;
 		}
 	}
-	cout << "[+] Copied the new import descriptors array to the new view (at the end of the original executable)" << endl;
 
 	// Copy our dll name into the new view (after the end of the new image import descriptors array)
 	if (!memcpy((PBYTE)newView + fileSize + numberOfImageImportDescriptors * sizeof(IMAGE_IMPORT_DESCRIPTOR), dllName, strlen(dllName) + 1)) {
@@ -208,7 +204,7 @@ int main(int argc, char *argv[]) {
 		cout << "[-] Error creating " << inFile << ". Quitting." << endl;
 		return 0;
 	}
-	else if (GetLastError()  == ERROR_FILE_EXISTS) {
+	else if (GetLastError() == ERROR_FILE_EXISTS) {
 		cout << "[-] " << inFile << " already exists. Quitting." << endl;
 		return 0;
 	}
@@ -217,5 +213,6 @@ int main(int argc, char *argv[]) {
 	}
 	cout << "[+] succseully added '" << dllName << "' dependency to " << inFile << endl;
 	cout << "Output File: " << outFile << endl;
+
 	return 0;
 }
