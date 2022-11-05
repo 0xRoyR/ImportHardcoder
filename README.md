@@ -31,6 +31,9 @@ After using this tool, we can drop our dll in the new executable's directory or 
 I heavily recommand replacing ```inFile``` with ```outFile``` using tool like SilentReplacer, which will make it harder for defenders to detect any changes to the executable that you have used the tool on.
 
 
+## Notes
+Please note that this tool only applies to x64 executables at the moment.
+
 ## Credits
 Apart from me ([Roy Rahamim](https://twitter.com/RBoomboom12312)), I would also like to credit [x86matthew](https://twitter.com/x86matthew).
 When I was in the middle of the process of writing my tool, I have noticed that he has already written the same tool and I got inspired of some little ideas of his, and added them to my implementation of this tool.
