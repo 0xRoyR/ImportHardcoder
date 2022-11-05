@@ -14,11 +14,11 @@ The tool takes 3 arguments:
 Here I will elaborate about what the tool does in depth.
 1. Opens the executable using the function ```CreateFileA```.
 2. Gets the size of the executable and reads it to memory using the functions ```GetFileSize```, ```ReadFile```.
-3. Parses the PE and copy the ```IMAGE_IMPORT_DESCRIPTOR``` structs to a new array called ```pImportDescriptors```.
-4. Creates new ILT (Import Lookup Table) for our dll called ```newImportLookupTable``` (of type ```IMAGE_THUNK_DATA``` array of length of 2).
-5. Calculates the size we need to append to the last section (and add it to the last section's current size).
-6. Makes sure the last section has ```IMAGE_SCN_MEM_READ```, ```IMAGE_SCN_MEM_WRITE``` permissions.
-7. Gets the RVA of the end of the executable.
+3. Parses the PE and copies the ```IMAGE_IMPORT_DESCRIPTOR``` structs to a new array called ```pImportDescriptors```.
+4. 7. Gets the RVA of the end of the executable.
+5. Creates new ILT (Import Lookup Table) for our dll called ```newImportLookupTable``` (of type ```IMAGE_THUNK_DATA``` array of length of 2).
+6. Calculates the size we need to append to the last section (and add it to the last section's current size).
+7. Makes sure the last section has ```IMAGE_SCN_MEM_READ```, ```IMAGE_SCN_MEM_WRITE``` permissions.
 8. Adds 2 additional entries to ```pImportDescriptors```. The first entry is the ```IMAGE_IMPORT_DESCRIPTOR``` struct that describes our dll, and the second entry is the terminating ```IMAGE_IMPORT_DESCRIPTOR``` struct.
 9. Sets the Image Data Directory Pointer (```dataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT]```) to point to the end of the execuable (hence, point to the location of ```pImportDescriptors```).
 10. Copies ```pImportDescriptors``` to after the original executable.
