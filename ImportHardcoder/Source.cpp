@@ -27,25 +27,10 @@ DWORD Rva2Offset(DWORD rva, PIMAGE_SECTION_HEADER psh, PIMAGE_NT_HEADERS pnt)
 	return (rva - pSeh->VirtualAddress + pSeh->PointerToRawData);
 }
 
-DWORD Offset2Rva(DWORD offset, PIMAGE_SECTION_HEADER psh, PIMAGE_NT_HEADERS pnt) {
-	size_t i = 0;
-	PIMAGE_SECTION_HEADER pSeh;
-	if (offset == 0) {
-		return offset;
-	}
-	pSeh = psh;
-	for (i = 0; i < pnt->FileHeader.NumberOfSections; i++) {
-		if (offset >= pSeh->PointerToRawData && offset < pSeh->PointerToRawData + pSeh->SizeOfRawData) {
-			return offset - pSeh->PointerToRawData + pSeh->VirtualAddress;
-		}
-		pSeh++;
-	}
-	return offset - pSeh->PointerToRawData + pSeh->VirtualAddress;
-}
-
 int main(int argc, char *argv[]) {
 	if (argc < 4) {
 		cout << "[-] Provided too few arguments. Quitting." << endl;
+		return 0;
 	}
 	LPCSTR inFile = argv[1]; // Path to the input exe file
 	LPCSTR dllName = argv[2]; // The name of the dll
@@ -75,13 +60,13 @@ int main(int argc, char *argv[]) {
 		cout << "[-] Invalid DOS Signature. Quitting" << endl;
 		return 0;
 	}
-	PIMAGE_NT_HEADERS64 ntHeaders = (PIMAGE_NT_HEADERS64)((PBYTE)view + dosHeader->e_lfanew);
+	PIMAGE_NT_HEADERS ntHeaders = (PIMAGE_NT_HEADERS)((PBYTE)view + dosHeader->e_lfanew);
 	if (ntHeaders->Signature != IMAGE_NT_SIGNATURE) {
 		cout << "[-] Invalid ntHeaders Signature. Quitting." << endl;
 		return 0;
 	}
 
-	PIMAGE_OPTIONAL_HEADER64 optionalHeader = (PIMAGE_OPTIONAL_HEADER64)&ntHeaders->OptionalHeader;
+	PIMAGE_OPTIONAL_HEADER optionalHeader = (PIMAGE_OPTIONAL_HEADER)&ntHeaders->OptionalHeader;
 	PIMAGE_DATA_DIRECTORY dataDirectory = (PIMAGE_DATA_DIRECTORY)(optionalHeader->DataDirectory);
 	PIMAGE_SECTION_HEADER* sectionHeaders = (PIMAGE_SECTION_HEADER*)malloc(ntHeaders->FileHeader.NumberOfSections * sizeof(PIMAGE_SECTION_HEADER));
 	for (int i = 0; i < ntHeaders->FileHeader.NumberOfSections; i++) {
@@ -89,8 +74,10 @@ int main(int argc, char *argv[]) {
 	}
 	cout << "[+] Read section headers" << endl;
 
-	if (dataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size == 0) {
+	IMAGE_DATA_DIRECTORY ttt = dataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
+	if (ttt.Size == 0) {
 		cout << "[?] No import table. Quitting." << endl;
+		cout << "Virtual Address of Data Directory: 0x" << dataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress << endl;
 		return 0;
 	}
 
@@ -115,13 +102,13 @@ int main(int argc, char *argv[]) {
 	cout << "[+] Got the RVA of the end of the executable" << endl;
 
 	// Create new import lookup table for our dll
-	IMAGE_THUNK_DATA64 newImportLookupTable[2];
+	IMAGE_THUNK_DATA newImportLookupTable[2];
 	newImportLookupTable[0].u1.Ordinal = 0x8000000000000001;
 	newImportLookupTable[1].u1.Ordinal = 0;
 	cout << "[+] Created new import lookup table" << endl;
 	 
 	// Determine the size to append to the last section.
-	DWORD totalAdditionalSize = numberOfImageImportDescriptors * sizeof(IMAGE_IMPORT_DESCRIPTOR) + 2 * sizeof(IMAGE_THUNK_DATA64) + strlen(dllName) + 1;
+	DWORD totalAdditionalSize = numberOfImageImportDescriptors * sizeof(IMAGE_IMPORT_DESCRIPTOR) + 2 * sizeof(IMAGE_THUNK_DATA) + strlen(dllName) + 1;
 	DWORD sizeToAppend = 0;
 	do {
 		sizeToAppend += optionalHeader->FileAlignment;
@@ -192,12 +179,12 @@ int main(int argc, char *argv[]) {
 	}
 	cout << "[+] Copied the dll name to the new view (at the end of the new image import descriptors array)" << endl;
 
-	// Copy our IMAGE_THUNK_DATA64 array into the new view (after the end of the dll name)
-	if (!memcpy((PBYTE)newView + fileSize + numberOfImageImportDescriptors * sizeof(IMAGE_IMPORT_DESCRIPTOR) + strlen(dllName) + 1, newImportLookupTable, sizeof(IMAGE_THUNK_DATA64) * 2)) {
-		cout << "[-] Error copying IMAGE_THUNK_DATA64 array name to the new view. Quitting" << endl;
+	// Copy our IMAGE_THUNK_DATA array into the new view (after the end of the dll name)
+	if (!memcpy((PBYTE)newView + fileSize + numberOfImageImportDescriptors * sizeof(IMAGE_IMPORT_DESCRIPTOR) + strlen(dllName) + 1, newImportLookupTable, sizeof(IMAGE_THUNK_DATA) * 2)) {
+		cout << "[-] Error copying IMAGE_THUNK_DATA array name to the new view. Quitting" << endl;
 		return 0;
 	}
-	cout << "[+] Copied the IMAGE_THUNK_DATA64 array to the new view (at the end of the dll name)" << endl;
+	cout << "[+] Copied the IMAGE_THUNK_DATA array to the new view (at the end of the dll name)" << endl;
 
 	HANDLE hOutFile = CreateFileA(outFile, GENERIC_ALL, 0, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (hFile == INVALID_HANDLE_VALUE) {
