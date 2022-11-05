@@ -47,7 +47,7 @@ int main(int argc, char *argv[]) {
 		cout << " [-] Error getting file size of " << inFile << ". Quitting" << endl;
 		return 0;
 	}
-	cout << "[+] Opened " << inFile << ". Handle Address: 0x" << hFile << ". File size: " << fileSize << endl;
+	cout << "[+] Opened " << inFile << ". Handle Address: 0x" << hFile << ". File size: " << fileSize << " bytes." << endl;
 
 	LPVOID view = (LPVOID)malloc(fileSize);
 	if (ReadFile(hFile, view, fileSize, NULL, NULL) == NULL) {
@@ -72,7 +72,7 @@ int main(int argc, char *argv[]) {
 	for (int i = 0; i < ntHeaders->FileHeader.NumberOfSections; i++) {
 		sectionHeaders[i] = (PIMAGE_SECTION_HEADER)((PBYTE)optionalHeader + ntHeaders->FileHeader.SizeOfOptionalHeader + sizeof(IMAGE_SECTION_HEADER) * i);
 	}
-	cout << "[+] Read section headers" << endl;
+	cout << "[+] Read section headers." << endl;
 
 	IMAGE_DATA_DIRECTORY ttt = dataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
 	if (ttt.Size == 0) {
@@ -95,17 +95,17 @@ int main(int argc, char *argv[]) {
 		pCurrImportDescriptor = (PIMAGE_IMPORT_DESCRIPTOR)((PBYTE)pCurrImportDescriptor + sizeof(IMAGE_IMPORT_DESCRIPTOR));
 		numberOfImageImportDescriptors++;
 	}
-	cout << "[+] Copied the original image import descriptors array" << endl;
+	cout << "[+] Copied the original image import descriptors array." << endl;
 
 	// Get the RVA of the end of the executable. This will use us later.
 	DWORD endOfLastSection_VirtualAddress = sectionHeaders[ntHeaders->FileHeader.NumberOfSections - 1]->VirtualAddress + sectionHeaders[ntHeaders->FileHeader.NumberOfSections - 1]->SizeOfRawData;
-	cout << "[+] Got the RVA of the end of the executable" << endl;
+	cout << "[+] Got the RVA of the end of the executable." << endl;
 
 	// Create new import lookup table for our dll
 	IMAGE_THUNK_DATA newImportLookupTable[2];
 	newImportLookupTable[0].u1.Ordinal = 0x8000000000000001;
 	newImportLookupTable[1].u1.Ordinal = 0;
-	cout << "[+] Created new import lookup table" << endl;
+	cout << "[+] Created new import lookup table." << endl;
 	 
 	// Determine the size to append to the last section.
 	DWORD totalAdditionalSize = numberOfImageImportDescriptors * sizeof(IMAGE_IMPORT_DESCRIPTOR) + 2 * sizeof(IMAGE_THUNK_DATA) + strlen(dllName) + 1;
@@ -117,11 +117,11 @@ int main(int argc, char *argv[]) {
 	// Add 'sizeToAppend' to the last section's size
 	sectionHeaders[ntHeaders->FileHeader.NumberOfSections - 1]->SizeOfRawData += sizeToAppend;
 	sectionHeaders[ntHeaders->FileHeader.NumberOfSections - 1]->Misc.VirtualSize += sizeToAppend;
-	cout << "[+] Appended the size of the last section by " << sizeToAppend << " bytes" << endl;
+	cout << "[+] Appended the size of the last section by " << sizeToAppend << " bytes." << endl;
 
 	// The last section must have read/write permissions at minimum to allow the loader to store the resolved IAT value
 	sectionHeaders[ntHeaders->FileHeader.NumberOfSections - 1]->Characteristics |= IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE;
-	cout << "[+] Added Read/Write permissions to the last section" << endl;
+	cout << "[+] Added Read/Write permissions to the last section." << endl;
 
 	// Allocate memory to 2 more Image Import Descriptors in our new array
 	pImportDescriptors = (PIMAGE_IMPORT_DESCRIPTOR*)realloc(pImportDescriptors, sizeof(PIMAGE_IMPORT_DESCRIPTOR) * (numberOfImageImportDescriptors + 2));
@@ -143,14 +143,14 @@ int main(int argc, char *argv[]) {
 	pImportDescriptors[numberOfImageImportDescriptors - 1]->Name = 0;
 	pImportDescriptors[numberOfImageImportDescriptors - 1]->OriginalFirstThunk = 0;
 	pImportDescriptors[numberOfImageImportDescriptors - 1]->TimeDateStamp = 0;
-	cout << "[+] Added 2 Image Import Descriptors to the image import descriptors array" << endl;
+	cout << "[+] Added 2 Image Import Descriptors to the image import descriptors array." << endl;
 
 	// Set the Image Data Directory pointer to point the new image import descriptors array
 	dataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress = endOfLastSection_VirtualAddress;
 	dataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size = numberOfImageImportDescriptors * sizeof(IMAGE_IMPORT_DESCRIPTOR);
-	cout << "[+] Image Data Directory now points to the new image import descriptors array" << endl;
+	cout << "[+] Image Data Directory now points to the new image import descriptors array." << endl;
 
-	// Allocate new view
+	// Reallocate view to be able to store the new image import descriptors array, dll name and the IMAGE_THUNK_DATA array
 	DWORD newFileSize = fileSize + sizeToAppend;
 	view = (LPVOID)realloc(view, newFileSize);
 	if (view == NULL) {
@@ -158,7 +158,7 @@ int main(int argc, char *argv[]) {
 		return 0;
 	}
 
-	// Copy the new image import descriptors into the new view (after the end of the original executable)
+	// Copy the new image import descriptors to after the end of the original executable
 	for (int i = 0; i < numberOfImageImportDescriptors; i++) {
 		if (!memcpy((PBYTE)view + fileSize + i * sizeof(IMAGE_IMPORT_DESCRIPTOR), pImportDescriptors[i], sizeof(IMAGE_IMPORT_DESCRIPTOR))) {
 			cout << "[-] Error copying the new import descriptors array at index " << i << ". Quitting." << endl;
@@ -166,19 +166,19 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	// Copy our dll name into the new view (after the end of the new image import descriptors array)
+	// Copy our dll name to after the end of the new image import descriptors array
 	if (!memcpy((PBYTE)view + fileSize + numberOfImageImportDescriptors * sizeof(IMAGE_IMPORT_DESCRIPTOR), dllName, strlen(dllName) + 1)) {
-		cout << "[-] Error copying the dll name to the new view. Quitting" << endl;
+		cout << "[-] Error copying the dll name. Quitting." << endl;
 		return 0;
 	}
-	cout << "[+] Copied the dll name to the new view (at the end of the new image import descriptors array)" << endl;
+	cout << "[+] Copied the dll name (at the end of the new image import descriptors array)." << endl;
 
-	// Copy our IMAGE_THUNK_DATA array into the new view (after the end of the dll name)
+	// Copy our IMAGE_THUNK_DATA array to after the end of the dll name
 	if (!memcpy((PBYTE)view + fileSize + numberOfImageImportDescriptors * sizeof(IMAGE_IMPORT_DESCRIPTOR) + strlen(dllName) + 1, newImportLookupTable, sizeof(IMAGE_THUNK_DATA) * 2)) {
-		cout << "[-] Error copying IMAGE_THUNK_DATA array name to the new view. Quitting" << endl;
+		cout << "[-] Error copying IMAGE_THUNK_DATA array. Quitting." << endl;
 		return 0;
 	}
-	cout << "[+] Copied the IMAGE_THUNK_DATA array to the new view (at the end of the dll name)" << endl;
+	cout << "[+] Copied the IMAGE_THUNK_DATA array (at the end of the dll name)." << endl;
 
 	HANDLE hOutFile = CreateFileA(outFile, GENERIC_ALL, 0, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (hFile == INVALID_HANDLE_VALUE) {
@@ -192,7 +192,7 @@ int main(int argc, char *argv[]) {
 	if (WriteFile(hOutFile, view, newFileSize, NULL, NULL) == NULL) {
 		cout << "[-] Error writing the modified exe to the destination file (" << outFile << "). Quitting." << endl;
 	}
-	cout << "[+] succseully added '" << dllName << "' dependency to " << inFile << endl;
+	cout << "[+] succseully added '" << dllName << "' dependency to " << inFile << "." << endl;
 	cout << "Output File: " << outFile << endl;
 
 	return 0;
