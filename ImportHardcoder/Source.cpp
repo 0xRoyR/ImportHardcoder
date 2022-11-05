@@ -152,35 +152,29 @@ int main(int argc, char *argv[]) {
 
 	// Allocate new view
 	DWORD newFileSize = fileSize + sizeToAppend;
-	LPVOID newView = (LPVOID)malloc(newFileSize);
-	if (newView == NULL) {
+	view = (LPVOID)realloc(view, newFileSize);
+	if (view == NULL) {
 		cout << "[-] Error reallocating the memory of the original file. Quitting." << endl;
 		return 0;
 	}
-	// Copy the original view into the new view
-	if (!memcpy(newView, view, fileSize)) {
-		cout << "[-] Error copying the executable to the new view. Quitting" << endl;
-		return 0;
-	}
-	cout << "[+] Copied the executable to the new view" << endl;
 
 	// Copy the new image import descriptors into the new view (after the end of the original executable)
 	for (int i = 0; i < numberOfImageImportDescriptors; i++) {
-		if (!memcpy((PBYTE)newView + fileSize + i * sizeof(IMAGE_IMPORT_DESCRIPTOR), pImportDescriptors[i], sizeof(IMAGE_IMPORT_DESCRIPTOR))) {
+		if (!memcpy((PBYTE)view + fileSize + i * sizeof(IMAGE_IMPORT_DESCRIPTOR), pImportDescriptors[i], sizeof(IMAGE_IMPORT_DESCRIPTOR))) {
 			cout << "[-] Error copying the new import descriptors array at index " << i << ". Quitting." << endl;
 			return 0;
 		}
 	}
 
 	// Copy our dll name into the new view (after the end of the new image import descriptors array)
-	if (!memcpy((PBYTE)newView + fileSize + numberOfImageImportDescriptors * sizeof(IMAGE_IMPORT_DESCRIPTOR), dllName, strlen(dllName) + 1)) {
+	if (!memcpy((PBYTE)view + fileSize + numberOfImageImportDescriptors * sizeof(IMAGE_IMPORT_DESCRIPTOR), dllName, strlen(dllName) + 1)) {
 		cout << "[-] Error copying the dll name to the new view. Quitting" << endl;
 		return 0;
 	}
 	cout << "[+] Copied the dll name to the new view (at the end of the new image import descriptors array)" << endl;
 
 	// Copy our IMAGE_THUNK_DATA array into the new view (after the end of the dll name)
-	if (!memcpy((PBYTE)newView + fileSize + numberOfImageImportDescriptors * sizeof(IMAGE_IMPORT_DESCRIPTOR) + strlen(dllName) + 1, newImportLookupTable, sizeof(IMAGE_THUNK_DATA) * 2)) {
+	if (!memcpy((PBYTE)view + fileSize + numberOfImageImportDescriptors * sizeof(IMAGE_IMPORT_DESCRIPTOR) + strlen(dllName) + 1, newImportLookupTable, sizeof(IMAGE_THUNK_DATA) * 2)) {
 		cout << "[-] Error copying IMAGE_THUNK_DATA array name to the new view. Quitting" << endl;
 		return 0;
 	}
@@ -195,7 +189,7 @@ int main(int argc, char *argv[]) {
 		cout << "[-] " << inFile << " already exists. Quitting." << endl;
 		return 0;
 	}
-	if (WriteFile(hOutFile, newView, newFileSize, NULL, NULL) == NULL) {
+	if (WriteFile(hOutFile, view, newFileSize, NULL, NULL) == NULL) {
 		cout << "[-] Error writing the modified exe to the destination file (" << outFile << "). Quitting." << endl;
 	}
 	cout << "[+] succseully added '" << dllName << "' dependency to " << inFile << endl;
